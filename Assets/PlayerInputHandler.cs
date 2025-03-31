@@ -43,8 +43,8 @@ public class NewMonoBehaviourScript : MonoBehaviour
             player.Jump();
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftShift)) {
-            player.Dash();
-        }
+        // if (Input.GetKeyDown(KeyCode.LeftShift)) {
+        //     player.Dash();
+        // }
     }
 }

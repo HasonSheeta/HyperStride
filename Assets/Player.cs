@@ -72,15 +72,6 @@ public class Player : MonoBehaviour
         gravityVelocity.y += jumpSpeed;
     }
 
-    public void Dash() {
-        if (dashesLeft <= 0) {
-            return;
-        }
-        if () {
-
-        }
-    }
-
     public bool CreatureOnGround() {
         return Physics.OverlapSphere(groundCheckTransform.position, 0.75f, terrainLayers).Length > 0;
     }
