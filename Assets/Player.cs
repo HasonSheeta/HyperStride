@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 
-
 public class Player : MonoBehaviour
 {
     [Header("Movement")]
@@ -77,7 +76,9 @@ public class Player : MonoBehaviour
         if (dashesLeft <= 0) {
             return;
         }
-        
+        if () {
+
+        }
     }
 
     public bool CreatureOnGround() {
