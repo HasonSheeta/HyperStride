@@ -561,6 +561,7 @@ GameObject:
   - component: {fileID: 550269051}
   - component: {fileID: 550269050}
   - component: {fileID: 550269049}
+  - component: {fileID: 550269056}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -585,6 +586,8 @@ MonoBehaviour:
   jumpSpeed: 10
   maxJumps: 1
   jumpsLeft: 1
+  maxDashes: 3
+  dashesLeft: 3
   groundCheckTransform: {fileID: 1545915410}
   terrainLayers:
     serializedVersion: 2
@@ -735,6 +738,18 @@ Transform:
   - {fileID: 1545915410}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &550269056
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 550269048}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3a1c3c0440c0f3a43ad6a012eee55f5b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1265188214
 GameObject:
   m_ObjectHideFlags: 0
