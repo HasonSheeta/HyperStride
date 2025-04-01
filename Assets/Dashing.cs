@@ -20,7 +20,7 @@ public class Dashing : MonoBehaviour
     private float dashCdTimer;
 
     [Header("Input")]
-    public KeyCode dashKey = KeyCode.LeftShift;
+    public KeyCode dashKey = KeyCode.E;
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
