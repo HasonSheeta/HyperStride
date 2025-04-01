@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
 
 public class Dashing : MonoBehaviour
 {
@@ -6,7 +8,7 @@ public class Dashing : MonoBehaviour
     public Transform orientation;
     public Transform playerCam;
     private Rigidbody rb;
-    private PlayerMovement pm;
+    private CharacterController pm;
 
     [Header("Dashing")]
     public float dashForce;
@@ -24,7 +26,7 @@ public class Dashing : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        pm = GetComponent<PlayerMovement>();
+        pm = GetComponent<CharacterController>();
     }
 
     // Update is called once per frame
