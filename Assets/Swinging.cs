@@ -58,6 +58,8 @@ public class Swinging : MonoBehaviour
         
         RaycastHit hit;
         if (Physics.Raycast(cam.position, cam.forward, out hit, maxSwingDistance, grappleable)) {
+            Debug.Log("Grapple point hit: " + hit.point);
+            
             swingPoint = hit.point;
             joint = player.gameObject.AddComponent<SpringJoint>();
             joint.autoConfigureConnectedAnchor = false;
@@ -74,6 +76,9 @@ public class Swinging : MonoBehaviour
 
             lr.positionCount = 2;
             currentGrapplePosition = gunTip.position;
+        }
+        else {
+            Debug.Log("Raycast did not hit anything.");
         }
     }
 
