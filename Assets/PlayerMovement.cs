@@ -8,6 +8,7 @@ public class PlayerMovement : MonoBehaviour
     public float walkSpeed;
     public float sprintSpeed;
     public float slideSpeed;
+    public float swingSpeed;
 
     private float desiredMoveSpeed;
     private float lastDesiredMoveSpeed;
@@ -58,10 +59,12 @@ public class PlayerMovement : MonoBehaviour
         sprinting,
         crouching,
         sliding,
+        swinging,
         air
     }
     
     public bool sliding;
+    public bool swinging;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -118,7 +121,11 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private void StateHandler() {
-        if (sliding) {
+        if (swinging) {
+            state = MovementState.swinging;
+            moveSpeed = swingSpeed;
+        }
+        else if (sliding) {
             state = MovementState.sliding;
 
             if (OnSlope() && rb.linearVelocity.y < 0.1f) {
@@ -180,6 +187,10 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private void MovePlayer() {
+        if (swinging) {
+            return;
+        }
+        
         moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
 
         if (OnSlope() && !exitingSlope) {
