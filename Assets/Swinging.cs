@@ -1,6 +1,8 @@
 using UnityEngine;
+using Unity.Netcode;
+using NUnit.Framework;
 
-public class Swinging : MonoBehaviour
+public class Swinging : NetworkBehaviour
 {
     [Header("References")]
     public LineRenderer lr;
@@ -9,10 +11,15 @@ public class Swinging : MonoBehaviour
     public PlayerMovement pm;
 
     [Header("Swinging")]
-    private float maxSwingDistance = 30f;
+    private float maxSwingDistance = 15f;
     private Vector3 swingPoint;
     private SpringJoint joint;
     private Vector3 currentGrapplePosition;
+    private Transform swingAnchorTransform; // test
+    private Vector3 localSwingAnchorPoint; // test
+    private NetworkVariable<Vector3> netGrappleStart = new NetworkVariable<Vector3>();
+    private NetworkVariable<Vector3> netGrappleEnd = new NetworkVariable<Vector3>();
+    private NetworkVariable<bool> isSwinging = new NetworkVariable<bool>();
 
     [Header("Air Movement")]
     public Transform orientation;
@@ -36,6 +43,14 @@ public class Swinging : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // if (!IsOwner) {
+        //     return;
+        // }
+        
+        if (joint != null && swingAnchorTransform != null) {
+            swingPoint = swingAnchorTransform.TransformPoint(localSwingAnchorPoint);
+        }
+        
         if (Input.GetKeyDown(swingKey)) {
             StartSwing();
         }
@@ -53,59 +68,65 @@ public class Swinging : MonoBehaviour
         DrawRope();
     }
 
-    private void StartSwing() {
-        pm.swinging = true;
-        
+    private void StartSwing()
+    {
+        if (!IsOwner) return;
+
         RaycastHit hit;
-        if (Physics.Raycast(cam.position, cam.forward, out hit, maxSwingDistance, grappleable)) {
-            Debug.Log("Grapple point hit: " + hit.point);
-            
-            swingPoint = hit.point;
-            joint = player.gameObject.AddComponent<SpringJoint>();
-            joint.autoConfigureConnectedAnchor = false;
-            joint.connectedAnchor = swingPoint;
+        if (Physics.Raycast(cam.position, cam.forward, out hit, maxSwingDistance, grappleable))
+        {
+            // Run local logic for rope and physics (ONLY for the owner)
+            SetupLocalSwing(hit.point, hit.transform);
 
-            float distanceFromPoint = Vector3.Distance(player.position, swingPoint);
-
-            joint.maxDistance = distanceFromPoint * 0.8f;
-            joint.minDistance = distanceFromPoint * 0.25f;
-
-            joint.spring = 4.5f;
-            joint.damper = 7f;
-            joint.massScale = 4.5f;
-
-            lr.positionCount = 2;
-            currentGrapplePosition = gunTip.position;
-        }
-        else {
-            Debug.Log("Raycast did not hit anything.");
+            // Tell server to update shared swing point
+            StartSwingServerRpc(hit.point, hit.transform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0);
         }
     }
 
     void StopSwing() {
-        pm.swinging = false;
-        
-        lr.positionCount = 0;
-        Destroy(joint);
-    }
-
-    void DrawRope() {
-        if (!joint) {
+        if (!IsOwner) {
             return;
         }
 
-        currentGrapplePosition = Vector3.Lerp(currentGrapplePosition, swingPoint, Time.deltaTime * 8f);
+        pm.swinging = false;
+        lr.positionCount = 0;
 
-        Debug.Log("Current Grapple Position: " + currentGrapplePosition);
-        
-        lr.SetPosition(0, gunTip.position);
-        lr.SetPosition(1, currentGrapplePosition);
-        
-        lr.startWidth = 0.1f;
-        lr.endWidth = 0.1f;
+        if (joint != null) {
+            Destroy(joint);
+            joint = null;
+        }
 
-        lr.startColor = Color.red;
-        lr.endColor = Color.red;
+        StopSwingServerRpc();
+    }
+
+    void DrawRope() {
+        if (IsOwner) {
+            if (joint == null) return;
+
+            currentGrapplePosition = Vector3.Lerp(currentGrapplePosition, swingPoint, Time.deltaTime * 8f);
+            lr.SetPosition(0, gunTip.position);
+            lr.SetPosition(1, currentGrapplePosition);
+        }
+        else {
+            if (!isSwinging.Value) {
+                lr.positionCount = 0;
+                return;
+            }
+
+            lr.positionCount = 2;
+            currentGrapplePosition = Vector3.Lerp(currentGrapplePosition, netGrappleEnd.Value, Time.deltaTime * 8f);
+
+            //Debug.Log("Current Grapple Position: " + currentGrapplePosition);
+        
+            lr.SetPosition(0, gunTip.position);
+            lr.SetPosition(1, currentGrapplePosition);
+        
+            lr.startWidth = 0.1f;
+            lr.endWidth = 0.1f;
+
+            lr.startColor = Color.red;
+            lr.endColor = Color.red;
+        }
     }
 
     private void AirMovement() {
@@ -121,6 +142,9 @@ public class Swinging : MonoBehaviour
         if (Input.GetKey(KeyCode.W)) {
             rb.AddForce(orientation.forward * forwardThrustForce * Time.deltaTime);
         }
+        if (Input.GetKey(KeyCode.S)) {
+            rb.AddForce(-orientation.forward * forwardThrustForce * Time.deltaTime);
+        }
 
         // Shorten Cable
         if (Input.GetKey(KeyCode.Space)) {
@@ -134,11 +158,66 @@ public class Swinging : MonoBehaviour
         }
 
         // Extend Cable
-        if (Input.GetKey(KeyCode.S)) {
+        if (Input.GetKey(KeyCode.C)) {
             float extendedDistanceFromPoint = Vector3.Distance(transform.position, swingPoint) + extendCableSpeed;
 
             joint.maxDistance = extendedDistanceFromPoint * 0.8f;
             joint.minDistance = extendedDistanceFromPoint * 0.25f;
         }
+    }
+
+    public bool IsSwinging() {
+        return joint != null;
+    }
+
+    public Vector3 GetSwingPoint() {
+        return swingPoint;
+    }
+
+    private void SetupLocalSwing(Vector3 hitPoint, Transform anchorTransform)
+    {
+        if (joint != null) {
+            Destroy(joint);
+        }
+        
+        swingAnchorTransform = anchorTransform;
+        localSwingAnchorPoint = anchorTransform.InverseTransformPoint(hitPoint);
+        swingPoint = hitPoint;
+
+        joint = player.gameObject.AddComponent<SpringJoint>();
+        joint.autoConfigureConnectedAnchor = false;
+        joint.connectedAnchor = swingPoint;
+
+        float distanceFromPoint = Vector3.Distance(player.position, swingPoint);
+        joint.maxDistance = distanceFromPoint * 0.8f;
+        joint.minDistance = distanceFromPoint * 0.25f;
+
+        joint.spring = 4.5f;
+        joint.damper = 7f;
+        joint.massScale = 4.5f;
+
+        lr.positionCount = 2;
+        currentGrapplePosition = gunTip.position;
+        pm.swinging = true;
+    }
+
+    [ServerRpc]
+    private void StartSwingServerRpc(Vector3 swingPosition, ulong anchorObjectId)
+    {
+        netGrappleStart.Value = gunTip.position;
+        netGrappleEnd.Value = swingPosition;
+        isSwinging.Value = true;
+    }
+
+    [ServerRpc]
+    private void StopSwingServerRpc() {
+        pm.swinging = false;
+
+        isSwinging.Value = false;
+        netGrappleStart.Value = Vector3.zero;
+        netGrappleEnd.Value = Vector3.zero;
+        
+        lr.positionCount = 0;
+        Destroy(joint);
     }
 }
