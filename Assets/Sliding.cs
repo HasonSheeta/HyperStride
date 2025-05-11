@@ -1,6 +1,7 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class Sliding : MonoBehaviour
+public class Sliding : NetworkBehaviour
 {
     [Header("References")]
     public Transform orientation;
@@ -33,6 +34,10 @@ public class Sliding : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (!IsOwner) {
+            return;
+        }
+        
         horizontalInput = Input.GetAxisRaw("Horizontal");
         verticalInput = Input.GetAxisRaw("Vertical");
 

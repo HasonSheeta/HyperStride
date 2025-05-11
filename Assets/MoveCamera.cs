@@ -1,6 +1,7 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class MoveCamera : MonoBehaviour
+public class MoveCamera : NetworkBehaviour
 {
     public Transform cameraPosition;
     
@@ -13,6 +14,10 @@ public class MoveCamera : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (!IsOwner) {
+            return;
+        }
+        
         transform.position = cameraPosition.position;
     }
 }
