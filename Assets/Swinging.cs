@@ -17,9 +17,15 @@ public class Swinging : NetworkBehaviour
     private Vector3 currentGrapplePosition;
     private Transform swingAnchorTransform; // test
     private Vector3 localSwingAnchorPoint; // test
-    private NetworkVariable<Vector3> netGrappleStart = new NetworkVariable<Vector3>();
-    private NetworkVariable<Vector3> netGrappleEnd = new NetworkVariable<Vector3>();
-    private NetworkVariable<bool> isSwinging = new NetworkVariable<bool>();
+    private NetworkVariable<Vector3> netGrappleStart = new NetworkVariable<Vector3>(
+        writePerm: NetworkVariableWritePermission.Owner
+    );
+    private NetworkVariable<Vector3> netGrappleEnd = new NetworkVariable<Vector3>(
+        writePerm: NetworkVariableWritePermission.Owner
+    );
+    private NetworkVariable<bool> isSwinging = new NetworkVariable<bool>(
+        writePerm: NetworkVariableWritePermission.Owner
+    );
 
     [Header("Air Movement")]
     public Transform orientation;
@@ -43,25 +49,32 @@ public class Swinging : NetworkBehaviour
     // Update is called once per frame
     void Update()
     {
-        // if (!IsOwner) {
-        //     return;
-        // }
-        
-        if (joint != null && swingAnchorTransform != null) {
-            swingPoint = swingAnchorTransform.TransformPoint(localSwingAnchorPoint);
-        }
-        
-        if (Input.GetKeyDown(swingKey)) {
-            StartSwing();
-        }
-        if (Input.GetKeyUp(swingKey)) {
-            StopSwing();
+        if (isSwinging.Value)
+        {
+            // Only allow movement logic for the local player
+            if (IsOwner)
+            {
+                if (joint != null && swingAnchorTransform != null)
+                {
+                    swingPoint = swingAnchorTransform.TransformPoint(localSwingAnchorPoint);
+                }
+
+                AirMovement(); // only for owner
+            }
+
+            DrawRope(); // always draw the rope for everyone
         }
 
-        if (joint != null) {
-            AirMovement();
+        if (IsOwner && Input.GetKeyDown(swingKey))
+        {
+            StartSwing();
+        }
+        if (IsOwner && Input.GetKeyUp(swingKey))
+        {
+            StopSwing();
         }
     }
+
 
     void LateUpdate()
     {
@@ -72,6 +85,8 @@ public class Swinging : NetworkBehaviour
     {
         if (!IsOwner) return;
 
+        pm.swinging = true;
+
         RaycastHit hit;
         if (Physics.Raycast(cam.position, cam.forward, out hit, maxSwingDistance, grappleable))
         {
@@ -79,7 +94,12 @@ public class Swinging : NetworkBehaviour
             SetupLocalSwing(hit.point, hit.transform);
 
             // Tell server to update shared swing point
-            StartSwingServerRpc(hit.point, hit.transform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0);
+            //StartSwingServerRpc(hit.point, hit.transform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0);
+
+            // Sync grapple to other clients
+            netGrappleStart.Value = gunTip.position;
+            netGrappleEnd.Value = hit.point;
+            isSwinging.Value = true;
         }
     }
 
@@ -96,38 +116,29 @@ public class Swinging : NetworkBehaviour
             joint = null;
         }
 
-        StopSwingServerRpc();
+        //StopSwingServerRpc();
+        isSwinging.Value = false;
     }
 
-    void DrawRope() {
-        if (IsOwner) {
-            if (joint == null) return;
-
-            currentGrapplePosition = Vector3.Lerp(currentGrapplePosition, swingPoint, Time.deltaTime * 8f);
-            lr.SetPosition(0, gunTip.position);
-            lr.SetPosition(1, currentGrapplePosition);
+    void DrawRope()
+    {
+        if (!isSwinging.Value)
+        {
+            lr.positionCount = 0;
+            return;
         }
-        else {
-            if (!isSwinging.Value) {
-                lr.positionCount = 0;
-                return;
-            }
 
-            lr.positionCount = 2;
-            currentGrapplePosition = Vector3.Lerp(currentGrapplePosition, netGrappleEnd.Value, Time.deltaTime * 8f);
+        lr.positionCount = 2;
 
-            //Debug.Log("Current Grapple Position: " + currentGrapplePosition);
-        
-            lr.SetPosition(0, gunTip.position);
-            lr.SetPosition(1, currentGrapplePosition);
-        
-            lr.startWidth = 0.1f;
-            lr.endWidth = 0.1f;
+        Vector3 start = IsOwner ? gunTip.position : netGrappleStart.Value;
+        Vector3 end = IsOwner ? swingPoint : netGrappleEnd.Value;
 
-            lr.startColor = Color.red;
-            lr.endColor = Color.red;
-        }
+        currentGrapplePosition = Vector3.Lerp(currentGrapplePosition, end, Time.deltaTime * 8f);
+
+        lr.SetPosition(0, start);
+        lr.SetPosition(1, currentGrapplePosition);
     }
+
 
     private void AirMovement() {
         // Right

@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.UI;
 
 public class PlayerCam : NetworkBehaviour
 {

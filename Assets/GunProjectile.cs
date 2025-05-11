@@ -23,6 +23,9 @@ public class GunProjectile : NetworkBehaviour
     public GameObject muzzleFlash;
     public TextMeshProUGUI ammunitionDisplay;
 
+    [SerializeField] private AudioClip gunshotSound;
+    public AudioSource audioSource;
+
     public bool allowInvoke = true;
     
     private void Awake() {
@@ -33,6 +36,10 @@ public class GunProjectile : NetworkBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        if (IsOwner) {
+            audioSource = GetComponent<AudioSource>();
+        }
+        
         //Debug.Log(GetComponent<NetworkObject>().IsSpawned);
     }
 
@@ -100,6 +107,8 @@ public class GunProjectile : NetworkBehaviour
         //GameObject currentBullet = Instantiate(bullet, attackPoint.position, Quaternion.identity);
         FireBulletServerRpc(directionWithSpread.normalized);
 
+        PlayShootSound();
+
         //rotate projectile to face direction
         //currentBullet.transform.forward = directionWithSpread.normalized;
 
@@ -139,6 +148,18 @@ public class GunProjectile : NetworkBehaviour
         reloading = false;
     }
 
+    public void PlayShootSound()
+    {
+        if (IsOwner) // Ensure that only the owner of the object triggers the sound locally
+        {
+            audioSource.PlayOneShot(gunshotSound);
+        }
+        else
+        {
+            PlayShootSoundOnClientRpc(); // If it's not the local player, call ClientRpc to play on all clients
+        }
+    }
+
     [ServerRpc]
     public void FireBulletServerRpc(Vector3 dir)
     {
@@ -147,10 +168,18 @@ public class GunProjectile : NetworkBehaviour
         var bulletScript = b.GetComponent<Bombs>();
         if (bulletScript != null)
         {
-            bulletScript.Init(dir);
+            Collider shooterCol = GetComponentInParent<Collider>();
+            bulletScript.Init(dir, shooterCol);
         }
         
         b.GetComponent<NetworkObject>().Spawn(true);
     }
 
+    [ClientRpc]
+    public void PlayShootSoundOnClientRpc() {
+        if (audioSource != null)
+        {
+            audioSource.PlayOneShot(gunshotSound);
+        }
+    }
 }
